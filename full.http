@@ -1,0 +1,6 @@
+GET /foo HTTP/1.0
+foo: bar
+baz: biff
+herp: 1
+
+body!!!
