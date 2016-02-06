@@ -16,8 +16,8 @@ enum Header {
 }
 
 macro_rules! warn {
-    ($fmt:expr) => (writeln!(io::stderr(), $fmt));
-    ($fmt:expr, $($arg:tt)*) => (writeln!(io::stderr(), $fmt, $($arg)*));
+    ($fmt:expr) => ((writeln!(io::stderr(), $fmt)).unwrap());
+    ($fmt:expr, $($arg:tt)*) => ((writeln!(io::stderr(), $fmt, $($arg)*)).unwrap());
 }
 
 fn early_exit(line: &str) -> ! {
@@ -141,12 +141,12 @@ fn main() {
     env::set_var("GATEWAY_INTERFACE", "CGI/1.1");
     env::set_var("SERVER_SOFTWARE", "httpd.rs/0.0.1");
     env::set_var("SERVER_NAME", env::var("TCPLOCALIP").unwrap_or_else(|e| {
-        warn!("Couldn't get TCPLOCALIP (not running under UCSPI?)");
+        warn!("Couldn't get TCPLOCALIP (not running under UCSPI?): {}", e);
         warn!("Defaulting to 127.0.0.1");
         String::from("127.0.0.1")
     }));
     env::set_var("SERVER_PORT", env::var("TCPLOCALPORT").unwrap_or_else(|e| {
-        warn!("Couldn't get TCPLOCALPORT (not running under UCSPI?)");
+        warn!("Couldn't get TCPLOCALPORT (not running under UCSPI?): {}", e);
         warn!("Defaulting to 80");
         String::from("80")
     }));
@@ -157,7 +157,10 @@ fn main() {
 
     warn!("\n\n\n");
     let mut req = String::new();
-    stdin.lock().read_line(&mut req);
+    stdin.lock().read_line(&mut req).unwrap_or_else(|e| {
+        warn!("WTF how can there not be a line: {}", e);
+        early_exit("500 Internal Server Error");
+    });
 
     set_request(req);
 
@@ -174,7 +177,7 @@ fn main() {
         match set_header(val, &mut content_length) {
             Ok(_) => (),
             Err(HTTP::_400) => early_exit("400 Invalid Header"),
-            Err(e) => early_exit("500 Internal Server Error"),
+            Err(_) => early_exit("500 Internal Server Error"),
         }
     }
 
@@ -199,7 +202,10 @@ fn main() {
         warn!("Failed to get child's STDIN");
         early_exit("500 Internal Server Error");
     });
-    copy_exact(&mut io::stdin(), &mut c_stdin, content_length);
+    copy_exact(&mut io::stdin(), &mut c_stdin, content_length).unwrap_or_else(|e| {
+        warn!("Failed to copy child's STDIN: {}", e);
+        early_exit("500 Internal Server Error");
+    });
     warn!("Written.");
 
     // Note that this is where Content-Length would be recorded and passed, but
@@ -211,7 +217,12 @@ fn main() {
         warn!("Failed to get child's STDOUT");
         early_exit("500 Internal Server Error");
     });
-    io::copy(&mut c_stdout, &mut io::stdout());
+    io::copy(&mut c_stdout, &mut io::stdout()).unwrap_or_else(|e| {
+        // XXX: note that if this happens who knows what got written to STDOUT; the 500 may end up
+        // in the middle of a file or something crazy like that, but what can you do?
+        warn!("Failed to copy child's STDOUT: {}", e);
+        early_exit("500 Internal Server Error");
+    });
     warn!("Written.");
 }
 
