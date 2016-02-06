@@ -51,7 +51,7 @@ fn set_header(line: String, content_length: &mut usize) -> Result<(), HTTP> {
             }
         }
     }
-    if valid == false {
+    if !valid {
         return Err(HTTP::_400);
     };
     let mut env_key = "HTTP_".to_owned();
