@@ -15,7 +15,7 @@ macro_rules! warn {
     ($fmt:expr, $($arg:tt)*) => (writeln!(io::stderr(), $fmt, $($arg)*));
 }
 
-fn set_header(line: String) {
+fn set_header(line: String, content_length: &mut usize) {
     let mut key: Vec<char> = Vec::new();
     let mut value: Vec<char> = Vec::new();
     let mut state = Header::Key;
@@ -49,6 +49,9 @@ fn set_header(line: String) {
 
     if env_key == "HTTP_CONTENT_TYPE" {
         env_key = String::from("CONTENT_TYPE");
+    } else if env_key == "HTTP_CONTENT_LENGTH" {
+        env_key = String::from("CONTENT_LENGTH");
+        *content_length = env_value.parse::<usize>().unwrap();
     }
     warn!("HEADER: {}={}", env_key, env_value);
     env::set_var(env_key, env_value);
@@ -125,6 +128,7 @@ fn main() {
 
     let stdin = io::stdin();
 
+    let mut content_length: usize = 0;
 
     warn!("\n\n\n");
     let mut req = String::new();
@@ -140,7 +144,7 @@ fn main() {
         if val == "" {
             break;
         }
-        set_header(val)
+        set_header(val, &mut content_length)
     }
 
     warn!("All headers set!\n");
@@ -162,9 +166,26 @@ fn main() {
     // because it would incur more memory overhead and it would be a hassle, Content-Length is not
     // supported.  Maybe I'll add support optionally
     warn!("Writing STDIN to child's STDIN...");
-    io::copy(&mut io::stdin(), &mut f.stdin.unwrap());
+    copy_exact(&mut io::stdin(), &mut f.stdin.unwrap(), content_length);
     warn!("Written.");
     warn!("Writing child's STDOUT to STDOUT...");
     io::copy(&mut f.stdout.unwrap(), &mut io::stdout());
     warn!("Written.");
+}
+
+fn copy_exact<R: Read, W: Write>(mut reader: R, mut writer: W,
+        length: usize) -> Result<(), std::io::Error> {
+    const BUFFER_SIZE: usize = 64 * 1024;
+    let mut buffer: Vec<u8> = vec![0; BUFFER_SIZE];
+
+    let mut buffer_left = length;
+    while buffer_left > BUFFER_SIZE {
+        try!(reader.read_exact(&mut buffer));
+        try!(writer.write_all(&buffer));
+        buffer_left -= BUFFER_SIZE;
+    }
+
+    try!(reader.read_exact(&mut buffer[..buffer_left]));
+    try!(writer.write_all(&buffer[..buffer_left]));
+    Ok(())
 }
