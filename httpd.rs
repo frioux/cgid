@@ -51,7 +51,8 @@ fn set_header(line: String, content_length: &mut usize) {
         env_key = String::from("CONTENT_TYPE");
     } else if env_key == "HTTP_CONTENT_LENGTH" {
         env_key = String::from("CONTENT_LENGTH");
-        *content_length = env_value.parse::<usize>().unwrap();
+        *content_length = env_value.parse::<usize>()
+            .expect("Invalid Content-Length")
     }
     warn!("HEADER: {}={}", env_key, env_value);
     env::set_var(env_key, env_value);
@@ -123,8 +124,10 @@ fn main() {
     env::set_var("GATEWAY_INTERFACE", "CGI/1.1");
     env::set_var("SERVER_SOFTWARE", "httpd.rs/0.0.1");
     // Maybe give a better error if this is unset
-    env::set_var("SERVER_NAME", env::var("TCPLOCALIP").unwrap());
-    env::set_var("SERVER_PORT", env::var("TCPLOCALPORT").unwrap());
+    env::set_var("SERVER_NAME", env::var("TCPLOCALIP")
+                 .expect("Invalid TCPLOCALIP (not running under UCSPI?)"));
+    env::set_var("SERVER_PORT", env::var("TCPLOCALPORT")
+                 .expect("Invalid TCPLOCALPORT (not running under UCSPI?)"));
 
     let stdin = io::stdin();
 
@@ -140,7 +143,7 @@ fn main() {
 
     // The following could likely be done better with a regex
     for line in stdin.lock().lines() {
-        let val = line.unwrap();
+        let val = line.expect("WTF how can there not be a line.");
         if val == "" {
             break;
         }
@@ -158,7 +161,7 @@ fn main() {
     child.stdin(Stdio::piped())
         .stdout(Stdio::piped());
     // Handle possible errors here?
-    let f = child.spawn().unwrap();
+    let f = child.spawn().expect("Failed to run child");
 
     // Handle possible errors here?
 
@@ -166,10 +169,10 @@ fn main() {
     // because it would incur more memory overhead and it would be a hassle, Content-Length is not
     // supported.  Maybe I'll add support optionally
     warn!("Writing STDIN to child's STDIN...");
-    copy_exact(&mut io::stdin(), &mut f.stdin.unwrap(), content_length);
+    copy_exact(&mut io::stdin(), &mut f.stdin.expect("Failed to read from child"), content_length);
     warn!("Written.");
     warn!("Writing child's STDOUT to STDOUT...");
-    io::copy(&mut f.stdout.unwrap(), &mut io::stdout());
+    io::copy(&mut f.stdout.expect("Failed to write to child"), &mut io::stdout());
     warn!("Written.");
 }
 
