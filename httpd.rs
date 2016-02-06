@@ -165,12 +165,13 @@ fn main() {
 
     // Handle possible errors here?
 
+    copy_exact(&mut io::stdin(), &mut f.stdin.expect("Failed to read from child"), content_length);
+    warn!("Written.");
+
     // Note that this is where Content-Length would be recorded and passed, but
     // because it would incur more memory overhead and it would be a hassle, Content-Length is not
     // supported.  Maybe I'll add support optionally
     warn!("Writing STDIN to child's STDIN...");
-    copy_exact(&mut io::stdin(), &mut f.stdin.expect("Failed to read from child"), content_length);
-    warn!("Written.");
     warn!("Writing child's STDOUT to STDOUT...");
     io::copy(&mut f.stdout.expect("Failed to write to child"), &mut io::stdout());
     warn!("Written.");
