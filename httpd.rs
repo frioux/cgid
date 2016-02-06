@@ -20,6 +20,21 @@ macro_rules! warn {
     ($fmt:expr, $($arg:tt)*) => ((writeln!(io::stderr(), $fmt, $($arg)*)).unwrap());
 }
 
+macro_rules! debug {
+    ($fmt:expr) => (
+        match option_env!("HTTPD_DEBUG") {
+            None => (),
+            Some(_) => warn!($fmt),
+        }
+    );
+    ($fmt:expr, $($arg:tt)*) => (
+        match option_env!("HTTPD_DEBUG") {
+            None => (),
+            Some(_) => warn!($fmt, $($arg)*),
+        }
+    );
+}
+
 fn early_exit(line: &str) -> ! {
     print!("HTTP/1.0 {}\r\n", line);
     std::process::exit(1);
@@ -70,7 +85,7 @@ fn set_header(line: String, content_length: &mut usize) -> Result<(), HTTP> {
             Err(_) => return Err(HTTP::_400),
         }
     }
-    warn!("HEADER: {}={}", env_key, env_value);
+    debug!("HEADER: {}={}", env_key, env_value);
     env::set_var(env_key, env_value);
     Ok(())
 }
@@ -94,7 +109,7 @@ fn set_request(line: String) {
         match state {
             Req::Method => {
                 if c == ' ' {
-                    warn!("METHOD: {}", method.iter().cloned().collect::<String>());
+                    debug!("METHOD: {}", method.iter().cloned().collect::<String>());
                     state = Req::PathInfo;
                 } else {
                     method.push(c);
@@ -103,10 +118,10 @@ fn set_request(line: String) {
             Req::PathInfo => {
                 if c == '?' {
                     state = Req::QueryString;
-                    warn!("PATH_INFO: {}", path_info.iter().cloned().collect::<String>());
+                    debug!("PATH_INFO: {}", path_info.iter().cloned().collect::<String>());
                 } else if c == ' ' {
                     state = Req::Protocol;
-                    warn!("PATH_INFO: {}", path_info.iter().cloned().collect::<String>());
+                    debug!("PATH_INFO: {}", path_info.iter().cloned().collect::<String>());
                 } else {
                     path_info.push(c);
                 }
@@ -114,14 +129,14 @@ fn set_request(line: String) {
             Req::QueryString => {
                 if c == ' ' {
                     state = Req::Protocol;
-                    warn!("QUERY_STRING: {}", query_string.iter().cloned().collect::<String>());
+                    debug!("QUERY_STRING: {}", query_string.iter().cloned().collect::<String>());
                 } else {
                     query_string.push(c);
                 }
             }
             Req::Protocol => {
                 if c == '\n' {
-                    warn!("SERVER_PROTOCOL: {}", server_protocol.iter().cloned().collect::<String>());
+                    debug!("SERVER_PROTOCOL: {}", server_protocol.iter().cloned().collect::<String>());
                     break;
                 }
                 server_protocol.push(c);
@@ -155,7 +170,7 @@ fn main() {
 
     let mut content_length: usize = 0;
 
-    warn!("\n\n\n");
+    debug!("\n\n\n");
     let mut req = String::new();
     stdin.lock().read_line(&mut req).unwrap_or_else(|e| {
         warn!("WTF how can there not be a line: {}", e);
@@ -164,7 +179,7 @@ fn main() {
 
     set_request(req);
 
-    warn!("Request header set!\n");
+    debug!("Request header set!\n");
 
     for line in stdin.lock().lines() {
         let val = line.unwrap_or_else(|e| {
@@ -181,7 +196,7 @@ fn main() {
         }
     }
 
-    warn!("All headers set!\n");
+    debug!("All headers set!\n");
 
     let args: Vec<_> = env::args().collect();
 
@@ -206,13 +221,13 @@ fn main() {
         warn!("Failed to copy child's STDIN: {}", e);
         early_exit("500 Internal Server Error");
     });
-    warn!("Written.");
+    debug!("Written.");
 
     // Note that this is where Content-Length would be recorded and passed, but
     // because it would incur more memory overhead and it would be a hassle, Content-Length is not
     // supported.  Maybe I'll add support optionally
-    warn!("Writing STDIN to child's STDIN...");
-    warn!("Writing child's STDOUT to STDOUT...");
+    debug!("Writing STDIN to child's STDIN...");
+    debug!("Writing child's STDOUT to STDOUT...");
     let mut c_stdout = f.stdout.unwrap_or_else(|| {
         warn!("Failed to get child's STDOUT");
         early_exit("500 Internal Server Error");
@@ -223,7 +238,7 @@ fn main() {
         warn!("Failed to copy child's STDOUT: {}", e);
         early_exit("500 Internal Server Error");
     });
-    warn!("Written.");
+    debug!("Written.");
 }
 
 fn copy_exact<R: Read, W: Write>(mut reader: R, mut writer: W,
