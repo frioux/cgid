@@ -141,7 +141,6 @@ fn main() {
 
     warn!("Request header set!\n");
 
-    // The following could likely be done better with a regex
     for line in stdin.lock().lines() {
         let val = line.expect("WTF how can there not be a line.");
         if val == "" {
