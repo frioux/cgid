@@ -41,12 +41,16 @@ fn set_header(line: String) {
         .replace("-", "_")
     );
     let env_value = value.iter().cloned().collect::<String>();
+
+    if env_key == "HTTP_CONTENT_TYPE" {
+        env_key = String::from("CONTENT_TYPE");
+    }
     env::set_var(env_key, env_value);
 }
 
 enum Req {
     Method,
-    ScriptName,
+    PathInfo,
     QueryString,
     Protocol
 }
@@ -54,7 +58,7 @@ enum Req {
 // https://www.ietf.org/rfc/rfc3875
 fn set_request(line: String) {
     let mut method: Vec<char> = Vec::new();
-    let mut script_name: Vec<char> = Vec::new();
+    let mut path_info: Vec<char> = Vec::new();
     let mut query_string: Vec<char> = Vec::new();
     let mut server_protocol: Vec<char> = Vec::new();
     let mut state = Req::Method;
@@ -63,18 +67,18 @@ fn set_request(line: String) {
         match state {
             Req::Method => {
                 if c == ' ' {
-                    state = Req::ScriptName;
+                    state = Req::PathInfo;
                 } else {
                     method.push(c);
                 }
             }
-            Req::ScriptName => {
+            Req::PathInfo => {
                 if c == '?' {
                     state = Req::QueryString;
                 } else if c == ' ' {
                     state = Req::Protocol;
                 } else {
-                    script_name.push(c);
+                    path_info.push(c);
                 }
             }
             Req::QueryString => {
@@ -85,14 +89,17 @@ fn set_request(line: String) {
                 }
             }
             Req::Protocol => {
+                if c == '\n' {
+                    break;
+                }
                 server_protocol.push(c);
             }
         }
     }
 
     env::set_var("REQUEST_METHOD", method.iter().cloned().collect::<String>());
-    env::set_var("SCRIPT_NAME", script_name.iter().cloned().collect::<String>());
-    env::set_var("PATH_INFO", script_name.iter().cloned().collect::<String>());
+    env::set_var("SCRIPT_NAME", "");
+    env::set_var("PATH_INFO", path_info.iter().cloned().collect::<String>());
     env::set_var("QUERY_STRING", query_string.iter().cloned().collect::<String>());
     env::set_var("REQUEST_URI", "/cgi-bin/app.cgi");
     env::set_var("SERVER_PROTOCOL", server_protocol.iter().cloned().collect::<String>());
@@ -133,6 +140,10 @@ fn main() {
     let f = child.spawn().unwrap();
 
     // Handle possible errors here?
+
+    // Note that this is where Content-Length would be recorded and passed, but
+    // because it would incur more memory overhead and it would be a hassle, Content-Length is not
+    // supported.  Maybe I'll add support optionally
     io::copy(&mut io::stdin(), &mut f.stdin.unwrap());
     io::copy(&mut f.stdout.unwrap(), &mut io::stdout());
 }
