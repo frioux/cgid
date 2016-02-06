@@ -10,6 +10,11 @@ enum Header {
     Value
 }
 
+macro_rules! warn {
+    ($fmt:expr) => (writeln!(io::stderr(), $fmt));
+    ($fmt:expr, $($arg:tt)*) => (writeln!(io::stderr(), $fmt, $($arg)*));
+}
+
 fn set_header(line: String) {
     let mut key: Vec<char> = Vec::new();
     let mut value: Vec<char> = Vec::new();
@@ -45,6 +50,7 @@ fn set_header(line: String) {
     if env_key == "HTTP_CONTENT_TYPE" {
         env_key = String::from("CONTENT_TYPE");
     }
+    warn!("HEADER: {}={}", env_key, env_value);
     env::set_var(env_key, env_value);
 }
 
@@ -67,6 +73,7 @@ fn set_request(line: String) {
         match state {
             Req::Method => {
                 if c == ' ' {
+                    warn!("METHOD: {}", method.iter().cloned().collect::<String>());
                     state = Req::PathInfo;
                 } else {
                     method.push(c);
@@ -75,8 +82,10 @@ fn set_request(line: String) {
             Req::PathInfo => {
                 if c == '?' {
                     state = Req::QueryString;
+                    warn!("PATH_INFO: {}", path_info.iter().cloned().collect::<String>());
                 } else if c == ' ' {
                     state = Req::Protocol;
+                    warn!("PATH_INFO: {}", path_info.iter().cloned().collect::<String>());
                 } else {
                     path_info.push(c);
                 }
@@ -84,12 +93,14 @@ fn set_request(line: String) {
             Req::QueryString => {
                 if c == ' ' {
                     state = Req::Protocol;
+                    warn!("QUERY_STRING: {}", query_string.iter().cloned().collect::<String>());
                 } else {
                     query_string.push(c);
                 }
             }
             Req::Protocol => {
                 if c == '\n' {
+                    warn!("SERVER_PROTOCOL: {}", server_protocol.iter().cloned().collect::<String>());
                     break;
                 }
                 server_protocol.push(c);
@@ -114,10 +125,14 @@ fn main() {
 
     let stdin = io::stdin();
 
+
+    warn!("\n\n\n");
     let mut req = String::new();
     stdin.lock().read_line(&mut req);
 
     set_request(req);
+
+    warn!("Request header set!\n");
 
     // The following could likely be done better with a regex
     for line in stdin.lock().lines() {
@@ -127,6 +142,8 @@ fn main() {
         }
         set_header(val)
     }
+
+    warn!("All headers set!\n");
 
     let args: Vec<_> = env::args().collect();
 
@@ -144,6 +161,10 @@ fn main() {
     // Note that this is where Content-Length would be recorded and passed, but
     // because it would incur more memory overhead and it would be a hassle, Content-Length is not
     // supported.  Maybe I'll add support optionally
+    warn!("Writing STDIN to child's STDIN...");
     io::copy(&mut io::stdin(), &mut f.stdin.unwrap());
+    warn!("Written.");
+    warn!("Writing child's STDOUT to STDOUT...");
     io::copy(&mut f.stdout.unwrap(), &mut io::stdout());
+    warn!("Written.");
 }
