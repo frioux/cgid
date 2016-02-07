@@ -226,6 +226,7 @@ fn main() {
         warn!("Failed to get child's STDIN");
         early_exit("500 Internal Server Error");
     });
+    debug!("Writing STDIN to child's STDIN...");
     copy_exact(&mut io::stdin(), &mut c_stdin, content_length).unwrap_or_else(|e| {
         warn!("Failed to copy child's STDIN: {}", e);
         early_exit("500 Internal Server Error");
@@ -235,12 +236,11 @@ fn main() {
     // Note that this is where Content-Length would be recorded and passed, but
     // because it would incur more memory overhead and it would be a hassle, Content-Length is not
     // supported.  Maybe I'll add support optionally
-    debug!("Writing STDIN to child's STDIN...");
-    debug!("Writing child's STDOUT to STDOUT...");
     let mut c_stdout = f.stdout.unwrap_or_else(|| {
         warn!("Failed to get child's STDOUT");
         early_exit("500 Internal Server Error");
     });
+    debug!("Writing child's STDOUT to STDOUT...");
     io::copy(&mut c_stdout, &mut io::stdout()).unwrap_or_else(|e| {
         // XXX: note that if this happens who knows what got written to STDOUT; the 500 may end up
         // in the middle of a file or something crazy like that, but what can you do?
