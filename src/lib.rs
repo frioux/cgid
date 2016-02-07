@@ -4,7 +4,7 @@ use std::io::prelude::*;
 use std::process::Command;
 use std::process::Stdio;
 
-enum HTTP {
+pub enum HTTP {
     _400,
     _500,
 }
@@ -77,7 +77,30 @@ fn parse_header(line: String) -> Result<(String, String), ()> {
     ));
 }
 
-fn set_header(line: String, content_length: &mut usize) -> Result<(), HTTP> {
+/// Sets an environment variable parsed from `line`
+///
+/// `line` must contain a `key` `value` pair separated by a `: ` (colon + optional trailing spaces).
+/// "key: value"
+///
+/// The environment variable name will be `key`: prefixed by 'HTTP_',
+/// converted to upper_case, and `-` replaced with `_`.
+///
+/// The value will have leading spaces removed but is otherwise unmodified.
+///
+/// # Examples
+///
+/// ```
+/// use httpd;
+/// use std::env;
+///
+/// let mut content_length: usize = 0;
+/// let result = httpd::set_header("key: value".to_string(), &mut content_length);
+///
+/// assert!(result.is_ok());
+/// assert_eq!(env::var("HTTP_KEY").unwrap(), "value");
+/// ```
+///
+pub fn set_header(line: String, content_length: &mut usize) -> Result<(), HTTP> {
     let (key, value) = match parse_header(line) {
         Ok((k, v)) => (k, v),
         Err(_) => return Err(HTTP::_400),
