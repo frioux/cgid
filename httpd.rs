@@ -40,7 +40,7 @@ fn early_exit(line: &str) -> ! {
     std::process::exit(1);
 }
 
-fn set_header(line: String, content_length: &mut usize) -> Result<(), HTTP> {
+fn parse_header(line: String) -> Result<(String, String), ()> {
     let mut key: Vec<char> = Vec::new();
     let mut value: Vec<char> = Vec::new();
     let mut state = Header::Key;
@@ -67,26 +67,35 @@ fn set_header(line: String, content_length: &mut usize) -> Result<(), HTTP> {
         }
     }
     if !valid {
-        return Err(HTTP::_400);
+        return Err(());
+    };
+    return Ok((
+        key.iter().cloned().collect::<String>()
+            .to_uppercase()
+            .replace("-", "_"),
+        value.iter().cloned().collect::<String>()
+    ));
+}
+
+fn set_header(line: String, content_length: &mut usize) -> Result<(), HTTP> {
+    let (key, value) = match parse_header(line) {
+        Ok((k, v)) => (k, v),
+        Err(_) => return Err(HTTP::_400),
     };
     let mut env_key = "HTTP_".to_owned();
-    env_key.push_str(&key.iter().cloned().collect::<String>()
-        .to_uppercase()
-        .replace("-", "_")
-    );
-    let env_value = value.iter().cloned().collect::<String>();
+    env_key.push_str(&key);
 
     if env_key == "HTTP_CONTENT_TYPE" {
         env_key = String::from("CONTENT_TYPE");
     } else if env_key == "HTTP_CONTENT_LENGTH" {
         env_key = String::from("CONTENT_LENGTH");
-        match env_value.parse::<usize>() {
+        match value.parse::<usize>() {
             Ok(n) => { *content_length = n },
             Err(_) => return Err(HTTP::_400),
         }
     }
-    debug!("HEADER: {}={}", env_key, env_value);
-    env::set_var(env_key, env_value);
+    debug!("HEADER: {}={}", env_key, value);
+    env::set_var(env_key, value);
     Ok(())
 }
 
