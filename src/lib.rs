@@ -161,7 +161,7 @@ fn set_request(line: String) {
     env::set_var("SERVER_PROTOCOL", server_protocol.iter().cloned().collect::<String>());
 }
 
-fn main() {
+pub fn main() {
     env::set_var("GATEWAY_INTERFACE", "CGI/1.1");
     env::set_var("SERVER_SOFTWARE", "httpd.rs/0.0.1");
     env::set_var("SERVER_NAME", env::var("TCPLOCALIP").unwrap_or_else(|e| {
