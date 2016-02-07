@@ -1,5 +1,6 @@
 use std::env;
 use std::io;
+use std::io::BufReader;
 use std::io::prelude::*;
 use std::process::Command;
 use std::process::Stdio;
@@ -40,7 +41,7 @@ fn early_exit(line: &str) -> ! {
     std::process::exit(1);
 }
 
-fn parse_header(line: String) -> Result<(String, String), ()> {
+fn parse_header(line: &String) -> Result<(String, String), ()> {
     let mut key: Vec<char> = Vec::new();
     let mut value: Vec<char> = Vec::new();
     let mut state = Header::Key;
@@ -101,7 +102,7 @@ fn parse_header(line: String) -> Result<(String, String), ()> {
 /// ```
 ///
 pub fn set_header(line: String, content_length: &mut usize) -> Result<(), HTTP> {
-    let (key, value) = match parse_header(line) {
+    let (key, value) = match parse_header(&line) {
         Ok((k, v)) => (k, v),
         Err(_) => return Err(HTTP::_400),
     };
@@ -259,12 +260,37 @@ pub fn main() {
     // Note that this is where Content-Length would be recorded and passed, but
     // because it would incur more memory overhead and it would be a hassle, Content-Length is not
     // supported.  Maybe I'll add support optionally
-    let mut c_stdout = f.stdout.unwrap_or_else(|| {
+    let c_stdout = f.stdout.unwrap_or_else(|| {
         warn!("Failed to get child's STDOUT");
         early_exit("500 Internal Server Error");
     });
+    let mut reader = BufReader::new(c_stdout);
     debug!("Writing child's STDOUT to STDOUT...");
-    io::copy(&mut c_stdout, &mut io::stdout()).unwrap_or_else(|e| {
+    loop {
+        let mut val = String::new();
+        reader.read_line(&mut val).unwrap_or_else(|e| {
+            warn!("WTF how can there not be a line: {}", e);
+            early_exit("500 Internal Server Error");
+        });
+        let (key, value) = match parse_header(&val) {
+            Ok((k, v)) => (k, v),
+            Err(_) => {
+                // XXX: note that if this happens who knows what got written to STDOUT; the 500 may
+                // end up in the middle of a file or something crazy like that, but what can you
+                // do?
+                warn!("Invalid header: {}", val);
+                early_exit("500 Internal Server Error");
+            }
+        };
+        if key == String::from("STATUS") {
+            print!("HTTP/1.0 {}\r\n", value);
+            // flush buffered headers
+            break;
+        } else {
+            // Buffer skipped headers
+        }
+    }
+    io::copy(&mut reader, &mut io::stdout()).unwrap_or_else(|e| {
         // XXX: note that if this happens who knows what got written to STDOUT; the 500 may end up
         // in the middle of a file or something crazy like that, but what can you do?
         warn!("Failed to copy child's STDOUT: {}", e);
