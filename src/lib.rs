@@ -158,7 +158,7 @@ enum Req {
 }
 
 // https://www.ietf.org/rfc/rfc3875
-fn set_request(line: String) {
+fn set_request(line: &String) {
     let mut method: Vec<char> = Vec::new();
     let mut path_info: Vec<char> = Vec::new();
     let mut query_string: Vec<char> = Vec::new();
@@ -237,7 +237,8 @@ pub fn main() {
         early_exit("500 Internal Server Error");
     });
 
-    set_request(req);
+    set_request(&req);
+    warn!("REQUEST: {}", req);
 
     debug!("Request header set!\n");
 
