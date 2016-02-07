@@ -41,7 +41,31 @@ fn early_exit(line: &str) -> ! {
     std::process::exit(1);
 }
 
-fn parse_header(line: &String) -> Result<(String, String), ()> {
+/// Parses header into (key, value) tuple
+///
+/// # Examples
+///
+/// ```
+/// use httpd;
+///
+/// let result = httpd::parse_header(&"key: value\r".to_string());
+///
+/// let (k, v) = result.unwrap();
+/// assert_eq!(k, "KEY");
+/// assert_eq!(v, "value");
+/// ```
+///
+/// It returns an Err if the header is malformed:
+///
+/// ```
+/// use httpd;
+///
+/// let result = httpd::parse_header(&"key=value".to_string());
+///
+/// assert!(result.is_err());
+/// ```
+///
+pub fn parse_header(line: &String) -> Result<(String, String), ()> {
     let mut key: Vec<char> = Vec::new();
     let mut value: Vec<char> = Vec::new();
     let mut state = Header::Key;
@@ -63,6 +87,9 @@ fn parse_header(line: &String) -> Result<(String, String), ()> {
                 }
             }
             Header::Value => {
+                if c == '\r' {
+                    break;
+                }
                 value.push(c)
             }
         }
