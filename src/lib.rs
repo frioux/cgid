@@ -167,7 +167,7 @@ fn set_request(line: String) {
                 }
             }
             Req::Protocol => {
-                if c == '\n' {
+                if c == '\n' || c == '\r' {
                     debug!("SERVER_PROTOCOL: {}", server_protocol.iter().cloned().collect::<String>());
                     break;
                 }
