@@ -1,5 +1,5 @@
-extern crate httpd;
+extern crate cgid;
 
 fn main() {
-    httpd::main()
+    cgid::main()
 }

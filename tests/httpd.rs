@@ -1,4 +1,4 @@
-extern crate httpd;
+extern crate cgid;
 
 use std::env;
 
@@ -12,7 +12,7 @@ fn test_set_header() {
     let expected_key = "HTTP_HEADER_TEST";  // HTTP_ prefix, upper_case, replace - with _
     let expected_value = "value";
 
-    assert!(httpd::set_header(input, &mut content_length).is_ok());
+    assert!(cgid::set_header(input, &mut content_length).is_ok());
     assert_eq!(env::var(expected_key).unwrap(), expected_value);
 }
 

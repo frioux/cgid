@@ -1,8 +1,12 @@
 [package]
-name = "httpd"
+name = "cgid"
 version = "0.1.0"
-authors = ["Arthur Axel 'fREW' Schmidt <frioux@gmail.com>"]
+authors = ["Arthur Axel 'fREW' Schmidt <cgid@afoolishmanifesto.com>"]
+description = "UCSPI compatible single-script CGI server"
+repository = "https://github.com/frioux/cgid"
+readme = "README.md"
+license = "MIT/Apache-2.0"
 
 [[bin]]
-name = "main"
+name = "cgid"
 doc = false

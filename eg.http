@@ -1,5 +1,0 @@
-GET /foo HTTP/1.0
-foo: bar
-baz: biff
-
-body!!!

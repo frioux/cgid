@@ -23,13 +23,13 @@ macro_rules! warn {
 
 macro_rules! debug {
     ($fmt:expr) => (
-        match option_env!("HTTPD_DEBUG") {
+        match option_env!("CGID_DEBUG") {
             None => (),
             Some(_) => warn!($fmt),
         }
     );
     ($fmt:expr, $($arg:tt)*) => (
-        match option_env!("HTTPD_DEBUG") {
+        match option_env!("CGID_DEBUG") {
             None => (),
             Some(_) => warn!($fmt, $($arg)*),
         }
@@ -46,9 +46,9 @@ fn early_exit(line: &str) -> ! {
 /// # Examples
 ///
 /// ```
-/// use httpd;
+/// use cgid;
 ///
-/// let result = httpd::parse_header(&"key: value\r".to_string());
+/// let result = cgid::parse_header(&"key: value\r".to_string());
 ///
 /// let (k, v) = result.unwrap();
 /// assert_eq!(k, "KEY");
@@ -58,9 +58,9 @@ fn early_exit(line: &str) -> ! {
 /// It returns an Err if the header is malformed:
 ///
 /// ```
-/// use httpd;
+/// use cgid;
 ///
-/// let result = httpd::parse_header(&"key=value".to_string());
+/// let result = cgid::parse_header(&"key=value".to_string());
 ///
 /// assert!(result.is_err());
 /// ```
@@ -118,11 +118,11 @@ pub fn parse_header(line: &String) -> Result<(String, String), ()> {
 /// # Examples
 ///
 /// ```
-/// use httpd;
+/// use cgid;
 /// use std::env;
 ///
 /// let mut content_length: usize = 0;
-/// let result = httpd::set_header("key: value".to_string(), &mut content_length);
+/// let result = cgid::set_header("key: value".to_string(), &mut content_length);
 ///
 /// assert!(result.is_ok());
 /// assert_eq!(env::var("HTTP_KEY").unwrap(), "value");
@@ -157,7 +157,6 @@ enum Req {
     Protocol
 }
 
-// https://www.ietf.org/rfc/rfc3875
 fn set_request(line: &String) {
     let mut method: Vec<char> = Vec::new();
     let mut path_info: Vec<char> = Vec::new();
@@ -208,13 +207,12 @@ fn set_request(line: &String) {
     env::set_var("SCRIPT_NAME", "");
     env::set_var("PATH_INFO", path_info.iter().cloned().collect::<String>());
     env::set_var("QUERY_STRING", query_string.iter().cloned().collect::<String>());
-    env::set_var("REQUEST_URI", "/cgi-bin/app.cgi");
     env::set_var("SERVER_PROTOCOL", server_protocol.iter().cloned().collect::<String>());
 }
 
 pub fn main() {
     env::set_var("GATEWAY_INTERFACE", "CGI/1.1");
-    env::set_var("SERVER_SOFTWARE", "httpd.rs/0.0.1");
+    env::set_var("SERVER_SOFTWARE", "cgid/0.1.0");
     env::set_var("SERVER_NAME", env::var("TCPLOCALIP").unwrap_or_else(|e| {
         warn!("Couldn't get TCPLOCALIP (not running under UCSPI?): {}", e);
         warn!("Defaulting to 127.0.0.1");
@@ -272,8 +270,6 @@ pub fn main() {
         early_exit("500 Internal Server Error");
     });
 
-    // Handle possible errors here?
-
     let mut c_stdin = f.stdin.unwrap_or_else(|| {
         warn!("Failed to get child's STDIN");
         early_exit("500 Internal Server Error");
@@ -303,9 +299,6 @@ pub fn main() {
         let (key, value) = match parse_header(&val) {
             Ok((k, v)) => (k, v),
             Err(_) => {
-                // XXX: note that if this happens who knows what got written to STDOUT; the 500 may
-                // end up in the middle of a file or something crazy like that, but what can you
-                // do?
                 warn!("Invalid header: {}", val);
                 early_exit("500 Internal Server Error");
             }
